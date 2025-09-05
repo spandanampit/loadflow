@@ -1,0 +1,46 @@
+{
+  "name": "load-flow",
+  "version": "0.1.0",
+  "private": true,
+  "homepage": "/load-flow",
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.6.0",
+    "@fortawesome/free-solid-svg-icons": "^6.6.0",
+    "@fortawesome/react-fontawesome": "^0.2.2",
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
+    "create-react-app": "^5.0.1",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.4.5",
+    "fabric": "^5.0.0",
+    "file-saver": "^2.0.5",
+    "jquery": "^3.7.1",
+    "jspdf": "^2.5.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^5.3.0",
+    "react-scripts": "^5.0.1",
+    "socket.io-client": "^4.8.1",
+    "uuid": "^10.0.0",
+    "webpack": "^5.94.0",
+    "xlsx": "^0.18.5"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
