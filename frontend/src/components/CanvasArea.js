@@ -5,14 +5,13 @@ import { useAppState } from "../StateContext";
 
 function CanvasArea({ selectedElement }) {
         const [canvases, setCanvases] = useState(() => {
-                // Clear local storage before initializing canvases
-                Object.keys(localStorage).forEach((key) => {
-                        if (key.startsWith("canvasState_tab")) {
-                                localStorage.removeItem(key);
-                        }
-                });
+            Object.keys(localStorage).forEach((key) => {
+                if (key.startsWith("canvasState_tab")) {
+                        localStorage.removeItem(key);
+                }
+            });
 
-                return [{ id: "canvas-1", name: "GUI 1", data: null }];
+            return [{ id: "canvas-1", name: "GUI 1", data: null }];
         });
 
         const [activeTab, setActiveTab] = useState("canvas-1");
@@ -20,13 +19,21 @@ function CanvasArea({ selectedElement }) {
         const canvasInstances = useRef({});
         const [copiedSelectedObject, setCopiedSelectedObject] = useState(null);
 
+        const containerRef = useRef(null);
+
+        const [containerHeight, setContainerHeight] = useState("auto"); 
+        const handleCanvasLoaded = () => {
+            console.log('called');
+            setContainerHeight(window.innerHeight - 80);
+        };
+
         const createArrowInPreviouscanvas = (activeObject) => {
                 const arrow = new fabric.Triangle({
                         width: 15,
                         height: 15,
                         fill: "grey",
-                        left: activeObject.left + 30, // Adjust to position relative to the bus
-                        top: activeObject.top + 5, // Center vertically with the bus
+                        left: activeObject.left + 30,
+                        top: activeObject.top + 5,
                         angle: 90, // Point right
                         selectable: true, // Make the arrow unselectable
                         evented: true, // Disable event handling for the arrow
@@ -125,8 +132,12 @@ function CanvasArea({ selectedElement }) {
                                         Add GUI
                                 </button>
                         </div>
-
-                        <div className="canvas-content">
+                                
+                        <div className="canvas-content" ref={containerRef}  style={{
+                                width: '100%',
+                                height: `${containerHeight}px`,
+                                overflow: 'auto'
+                            }}>
                                 {canvases.map((canvas) =>
                                         activeTab === canvas.id ? (
                                                 <FabricCanvas
@@ -142,6 +153,7 @@ function CanvasArea({ selectedElement }) {
                                                                         data
                                                                 )
                                                         }
+                                                        onCanvasLoaded={handleCanvasLoaded}
                                                         onRegister={(
                                                                 canvasInstance
                                                         ) =>

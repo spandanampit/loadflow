@@ -35,6 +35,7 @@ import { jsPDF } from "jspdf";
 import { generateFiles, generateExcelFile } from "../helper/FileSaver";
 import { faL } from "@fortawesome/free-solid-svg-icons";
 import { InductionFormat } from "../helper/FormatInput";
+import CanvasLoader from "./CanvasLoader";
 import axios from "axios";
 
 function FabricCanvas({
@@ -46,6 +47,7 @@ function FabricCanvas({
     onRegister,
     activeTab,
     canvasInstances,
+    onCanvasLoaded
 }) {
     const canvasRef = useRef(null);
     const minimapRef = useRef(null);
@@ -77,6 +79,9 @@ function FabricCanvas({
     });
 
     const [canvasObjects, setCanvasObjects] = useState({});
+    const [canvasContainerHeight, setCanvasContainerHeight] = useState(window.innerHeight - 100);
+    const [canvasContainerWidth, setCanvasContainerWidth] = useState(1500);
+
     let selectionPos = {};
     let bringAllTimeout;
 
@@ -162,6 +167,10 @@ function FabricCanvas({
     };
 
     const [objectProps, setObjectProps] = useState(allproperties);
+
+    const [selectedCanvas, setSelectedCanvas] = useState(null);
+
+    
 
     useEffect(() => {
         if (propertyVisible.current !== state.isPropertiesBarVisible) {
@@ -719,208 +728,119 @@ function FabricCanvas({
     // const minimapWrapper = document.createElement('div');
     // minimapWrapper.id = 'minimapWrapper';
 
-    function addMinimap() {
-        // Create minimap canvas element using JavaScript
-        // const minimapCanvasElement = document.createElement('canvas');
-        // minimapCanvasElement.id = 'minimapCanvas';
-        // minimapCanvasElement.width = 400;
-        // minimapCanvasElement.height = 400;
-        // minimapWrapper.appendChild(minimapCanvasElement);
-        // document.body.appendChild(minimapWrapper);
-        // minimapCanvasRef.current = new fabric.Canvas();
-        updateMinimap();
-    }
+
     function getScaleFactor() {
-        const minimapSize = 400; // Minimap should be approx 400x400
+        const minimapSize = 400; 
         const maxDimension = Math.max(
             fabricCanvasRef.current.width,
             fabricCanvasRef.current.height
         );
         return minimapSize / maxDimension;
     }
+
+    
     function updateMinimap() {
+        const mainCanvas = fabricCanvasRef.current;
         const minimapCanvas = fabricCanvasRef.currentMinimap;
-        minimapCanvas.clear();
-        minimapCanvas.renderAll();
+        if (!mainCanvas || !minimapCanvas) return;
 
         const canvasContent = document.querySelector(".canvas-content");
-        const topPosition = canvasContent.getBoundingClientRect().top;
-        // const remainingHeight = window.innerHeight - topPosition - 15;
-        const containerWidth = canvasContent.getBoundingClientRect().width;
-        const containerHeight = canvasContent.getBoundingClientRect().height;
+        if (!canvasContent) return;
 
-        const mainCanvas = fabricCanvasRef.current;
+
+        const containerWidth = canvasContent.clientWidth;
+        const containerHeight = canvasContent.clientHeight;
+
+        const scrollLeft = canvasContent.scrollLeft;
+        const scrollTop = canvasContent.scrollTop;
+
         const mainWidth = mainCanvas.getWidth();
         const mainHeight = mainCanvas.getHeight();
 
         const aspectRatio = mainWidth / mainHeight;
         let minimapWidth, minimapHeight;
-
         if (aspectRatio > 1) {
-            minimapWidth = Math.min(300, mainWidth);
+            minimapWidth = 300;
             minimapHeight = minimapWidth / aspectRatio;
         } else {
-            minimapHeight = Math.min(300, mainHeight);
+            minimapHeight = 300;
             minimapWidth = minimapHeight * aspectRatio;
         }
-
         minimapCanvas.setWidth(minimapWidth);
         minimapCanvas.setHeight(minimapHeight);
 
-        const scaleFactor = minimapWidth / mainWidth;
-        // const scaleFactor = getScaleFactor();
+        const scaleX = minimapWidth / mainWidth;
+        const scaleY = minimapHeight / mainHeight;
 
-        const dataURL = fabricCanvasRef.current.toDataURL({
-            format: "png",
-            quality: 0.5,
-        });
-        const folderElement = document.querySelector(".minimap");
-        if (folderElement) {
-            folderElement.style.backgroundImage = `url(${dataURL})`;
-            folderElement.style.backgroundSize = "cover"; // Make the image cover the element
-            folderElement.style.backgroundPosition = "center"; // Center the image
-        }
-
-        // fabric.Image.fromURL(dataURL, async (img) => {
-        //   img.set({
-        //     scaleX: scaleFactor,
-        //     scaleY: scaleFactor,
-        //     left: 0,
-        //     top: 0,
-        //     selectable: false, // Make minimap image non-selectable
-        //     evented: false,
-        //   });
-        //   minimapCanvas.add(img);
-
-        // Draw viewport rectangle on minimap
-        const viewport = new fabric.Rect({
-            left: -fabricCanvasRef.current.viewportTransform[4] * scaleFactor,
-            top: -fabricCanvasRef.current.viewportTransform[5] * scaleFactor,
-            width: containerWidth * scaleFactor,
-            height: containerHeight * scaleFactor,
-            fill: "rgba(0, 0, 255, 0.2)",
-            stroke: "blue",
-            name: "viewport",
-        });
-
-        viewport.on("moving", () => {
-            if (viewport.left < 0) {
-                viewport.left = 0;
-            }
-            if (viewport.top < 0) {
-                viewport.top = 0;
-            }
-            if (viewport.left + viewport.width > minimapCanvas.getWidth()) {
-                viewport.left = minimapCanvas.getWidth() - viewport.width;
-            }
-            if (viewport.top + viewport.height > minimapCanvas.getHeight()) {
-                viewport.top = minimapCanvas.getHeight() - viewport.height;
-            }
-            const newLeft = viewport.left / scaleFactor;
-            const newTop = viewport.top / scaleFactor;
-
-            //mainCanvas.viewportTransform[4] = -newLeft;
-            //mainCanvas.viewportTransform[5] = -newTop;
-
-            mainCanvas.renderAll();
-
-            // Sync .canvas-content scroll with the main canvas viewport
-            const canvasContent = document.querySelector(".canvas-content");
-            canvasContent.scrollLeft = newLeft;
-            canvasContent.scrollTop = newTop;
-        });
-        // const existingViewport = await minimapCanvas.getObjects().forEach((object) => {
-        //   console.log("object.type :::: ", object.type);
-        //   console.log("object.name :::: ", object.name);
-        //   if(object.type == 'rect'){
-        //     minimapCanvas.remove(object);
-        //     minimapCanvas.requestRenderAll();
-        //   }
-        // })
-        // if (existingViewport) {
-        //   minimapCanvas.remove(existingViewport);
-        // }
         minimapCanvas.clear();
-        minimapCanvas.add(viewport);
-        // });
-    }
-    const updateMinimapViewport = () => {
-        const canvasContent = document.querySelector(".canvas-content");
-        const mainCanvas = fabricCanvasRef.current;
-        const minimapCanvas = fabricCanvasRef.currentMinimap;
 
-        const scaleFactor = minimapCanvas.getWidth() / mainCanvas.getWidth();
+        const dataURL = mainCanvas.toDataURL({ format: "png", quality: 0.5 });
 
-        // Get the current scroll position of the canvas content
-        const scrollLeft = canvasContent.scrollLeft;
-        const scrollTop = canvasContent.scrollTop;
-
-        // Find the viewport rectangle on the minimap
-        const viewportRect = minimapCanvas
-            .getObjects()
-            .find((object) => object.name === "viewport");
-
-        if (viewportRect) {
-            // Update the viewport rectangle's position based on the scroll position
-            viewportRect.left = scrollLeft * scaleFactor;
-            viewportRect.top = scrollTop * scaleFactor;
-
-            // Re-render the minimap to reflect the changes
-            minimapCanvas.requestRenderAll();
-        }
-    };
-    function refreshCoordsForAll(polyline) {
-        var dims = polyline._calcDimensions();
-        polyline.set({
-            width: dims.width,
-            height: dims.height,
-            left: dims.left,
-            top: dims.top,
-            pathOffset: {
-                x: dims.width / 2 + dims.left,
-                y: dims.height / 2 + dims.top,
-            },
-            dirty: true,
-        });
-        polyline.objectCaching = false; // Disable caching
-        polyline.dirty = true;
-        fabricCanvasRef.current.renderAll(); // Refresh the canvas after updating coords
-    }
-
-    const wrapperRef = useRef(null);
-    useEffect(() => {
-        isLinkObjectRef.current = state.isLinkObject;
-        if (fabricCanvasRef.current) {
-            fabricCanvasRef.current.getObjects().forEach((obj) => {
-                // if (obj.elementCategory !== "Bus") {
-                if (!obj.orSelectable) obj.orSelectable = obj.selectable;
-                if (!obj.orEvented) obj.orEvented = obj.evented;
-                // }
+        fabric.Image.fromURL(dataURL, (img) => {
+            img.set({
+                scaleX: scaleX,
+                scaleY: scaleY,
+                left: 0,
+                top: 0,
+                selectable: false,
+                evented: false,
             });
-        }
+            minimapCanvas.add(img);
 
-        if (isLinkObjectRef.current) {
-            document.body.classList.add("edit-mode");
-        } else {
-            document.body.classList.remove("edit-mode");
-        }
-        object1Ref.current = state.object1;
-        activePolylineRef.current = state.activePolyline;
-    }, [state.isLinkObject, state.object1, state.activePolyline]);
+            const viewport = new fabric.Rect({
+                left: scrollLeft * scaleX,
+                top: scrollTop * scaleY,
+                width: containerWidth * scaleX,
+                height: containerHeight * scaleY,
+                fill: "rgba(0, 0, 255, 0.2)",
+                stroke: "blue",
+                name: "viewport",
+                selectable: true,
+                hasControls: false,
+            });
 
-    // Event handler for expanding canvas on object movement
+            viewport.on("moving", () => {
+                if (viewport.left < 0) viewport.left = 0;
+                if (viewport.top < 0) viewport.top = 0;
+                if (viewport.left + viewport.width > minimapCanvas.getWidth()) {
+                    viewport.left = minimapCanvas.getWidth() - viewport.width;
+                }
+                if (viewport.top + viewport.height > minimapCanvas.getHeight()) {
+                    viewport.top = minimapCanvas.getHeight() - viewport.height;
+                }
+
+                canvasContent.scrollLeft = viewport.left / scaleX;
+                canvasContent.scrollTop = viewport.top / scaleY;
+            });
+
+            minimapCanvas.add(viewport);
+            minimapCanvas.bringToFront(viewport);
+            minimapCanvas.renderAll();
+
+            canvasContent.addEventListener("scroll", () => {
+                viewport.set({
+                    left: canvasContent.scrollLeft * scaleX,
+                    top: canvasContent.scrollTop * scaleY,
+                });
+                viewport.setCoords();
+                minimapCanvas.renderAll();
+            });
+        });
+    }
+
+
     const handleObjectMoving = (e) => {
-        // return "";
-        // console.log("handleObjectMoving");
-
         const canvas = fabricCanvasRef.current;
+        if (!canvas) return;
+
         const canvasWidth = canvas.getWidth();
         const canvasHeight = canvas.getHeight();
 
         let expandWidth = 0;
         let expandHeight = 0;
 
-        const object = canvas.getActiveObject();
+        const object = e?.target || canvas.getActiveObject();
+        if (!object) return;
 
         object.setCoords();
         let textBound = 0;
@@ -931,14 +851,8 @@ function FabricCanvas({
             textBound = textObj.getBoundingRect(true);
         }
 
-        // Loop through all objects on the canvas
-        // canvas.getObjects().forEach((object) => {
+        const boundingRect = object.getBoundingRect(true);
 
-        //return "";
-        // Get the bounding rectangle of the object (including transformations)
-        const boundingRect = e?.target || object.getBoundingRect(true);
-
-        // Check if the object extends beyond the right side of the canvas
         if (boundingRect.left + boundingRect.width > canvasWidth) {
             expandWidth =
                 Math.max(
@@ -948,13 +862,9 @@ function FabricCanvas({
         }
         if (textBound && textBound.left + textBound.width > canvasWidth) {
             expandWidth =
-                Math.max(
-                    expandWidth,
-                    textBound.left + textBound.width - canvasWidth
-                ) + 100;
+                Math.max(expandWidth, textBound.left + textBound.width - canvasWidth) + 100;
         }
 
-        // Check if the object extends beyond the bottom side of the canvas
         if (boundingRect.top + boundingRect.height > canvasHeight) {
             expandHeight = Math.max(
                 expandHeight,
@@ -968,412 +878,39 @@ function FabricCanvas({
             );
         }
 
-        // Check if the object extends beyond the left side of the canvas
         if (boundingRect.left < 0) {
             expandWidth = Math.max(expandWidth, Math.abs(boundingRect.left));
         }
 
-        // Check if the object extends beyond the top side of the canvas
         if (boundingRect.top < 0) {
             expandHeight = Math.max(expandHeight, Math.abs(boundingRect.top));
         }
-        // });
 
-        // Adjust the canvas size if necessary
         if (expandWidth > 0 || expandHeight > 0) {
             canvas.setWidth(canvasWidth + expandWidth);
             canvas.setHeight(canvasHeight + expandHeight);
             canvas.originalWidth = canvasWidth + expandWidth;
             canvas.originalHeight = canvasHeight + expandHeight;
             canvas.renderAll();
-            // updateMinimap();
         }
     };
 
-    // Initialize the Fabric.js canvas
+
+
     useEffect(() => {
-        const fabricCanvas = new fabric.Canvas(canvasRef.current, {
-            containerClass: "main",
-        });
-
-        fabricCanvasRef.current = fabricCanvas;
-        const canvasContent = document.querySelector(".canvas-content");
-        const topPosition = canvasContent.getBoundingClientRect().top;
-        const remainingHeight = window.innerHeight - topPosition - 15;
-        canvasContent.style.height = `${remainingHeight}px`;
-        if (!fabricCanvasRef.currentMinimap) {
-            fabricCanvasRef.currentMinimap = new fabric.Canvas("minimap", {
-                containerClass: "minimap",
+        if (canvasRef.current && !fabricCanvasRef.current) {
+                fabricCanvasRef.current = new fabric.Canvas(canvasRef.current, {
+                preserveObjectStacking: true,
+            });
+        }
+        if (minimapRef.current && !fabricCanvasRef.currentMinimap) {
+            fabricCanvasRef.currentMinimap = new fabric.Canvas(minimapRef.current, {
                 selection: false,
+                interactive: true,
             });
-            savehistoryEnabled.current = true;
         }
-        fabricCanvasRef.current.ID = uuidv4();
-        // Load from localStorage if available
-        const storedCanvasState = localStorage.getItem(
-            `canvasState_tab${canvasId}`
-        );
-        if (storedCanvasState) {
-            const parsedState = JSON.parse(storedCanvasState);
-            // console.log(
-            //   "Canvas State after Load:",
-            //   fabricCanvasRef.current.viewportTransform
-            // );
-            loadCanvas2(parsedState);
-        } else {
-            fabricCanvasRef.current.clear();
-        }
-        // Load saved data if available
-        // if (savedData) {
-        //   fabricCanvas.loadFromJSON(savedData, () => {
-        //     const parsedState = JSON.parse(savedData);
-        //     loadCanvas2(parsedState);
-        //   });
-        // }
+    }, []);
 
-        // const saveState = () => {
-        //   const json = JSON.stringify(fabricCanvasRef.current.toJSON(allproperties));
-        //   onSave(json);
-        // };
-
-        // fabricCanvas.on("object:added", saveState);
-        // fabricCanvas.on("object:modified", saveState);
-        // fabricCanvas.on("object:removed", saveState);
-        // Register canvas instance with parent
-        if (onRegister) {
-            onRegister(fabricCanvas);
-        }
-
-        fabricCanvasRef.current.objectCaching = false;
-        fabricCanvasRef.current.systemConfiguration =
-            systemConfigurationProperties();
-        fabricCanvasRef.current.storedData = "";
-        fabricCanvasRef.current.engineInputURL = "";
-        fabricCanvasRef.current.engineInputFolderName = "";
-        fabricCanvasRef.current.engineOutput = "";
-        fabric.Object.prototype.objectCaching = false;
-
-        fabric.Object.prototype.hasControls = false;
-        let lastExecution = 0;
-        fabricCanvasRef.current.on("mouse:up:before", function () {
-            //arasu
-            var canvas = fabricCanvasRef.current;
-            const getSelectedObject = canvas.getActiveObject();
-            if (
-                getSelectedObject &&
-                getSelectedObject.type === "activeSelection"
-            ) {
-                if (!canvas.selectionPos) canvas.selectionPos = {};
-                canvas.selectionPos.leftOffset =
-                    getSelectedObject.left - canvas.selectionPos.left;
-                canvas.selectionPos.topOffset =
-                    getSelectedObject.top - canvas.selectionPos.top;
-                console.log("selectionPos :::: ", canvas.selectionPos);
-            }
-        });
-        addMinimap();
-        fabricCanvasRef.current.on("mouse:up", function (options) {
-            if (!state.object2) {
-                const activeGroup = fabricCanvasRef.current.getActiveObjects();
-                //console.log("mouse:up",activeGroup);
-                activeGroup.forEach((obj) => {
-                    if (obj.isLine) {
-                        console.log("testing-moving:", obj);
-                        if (activeGroup.length == 0) {
-                            console.log("testuiing", obj);
-                            obj.set("left", obj.oldLeft);
-                            obj.set("top", obj.oldTop);
-                            obj.set("angle", 0);
-
-                            obj.set("lockMovementX", true);
-                            obj.set("lockMovementY", true);
-                            obj.set("lockScalingX", true);
-                            obj.set("lockScalingY", true);
-                            obj.set("lockScalingFlip", true);
-                            //console.log("object mouse up testing log");
-                        }
-                    }
-                });
-                const now = Date.now();
-                if (now - lastExecution > 50) {
-                    //Snap Start
-                    let obj = activeGroup;
-                    const gridSize = 75;
-                    const snapThreshold = 10;
-
-                    // Calculate the distance to the nearest grid line for the left and top positions
-                    const snapLeft = Math.round(obj.left / gridSize) * gridSize;
-                    const snapTop = Math.round(obj.top / gridSize) * gridSize;
-
-                    // Check if the object's left position is within the snap threshold
-                    if (Math.abs(obj.left - snapLeft) < snapThreshold) {
-                        obj.set({ left: snapLeft });
-                    }
-
-                    // Check if the object's top position is within the snap threshold
-                    if (Math.abs(obj.top - snapTop) < snapThreshold) {
-                        obj.set({ top: snapTop });
-                    }
-                }
-                fabricCanvasRef.current.renderAll();
-            }
-
-            //update left side canvas side
-            // const activeGroup = fabricCanvasRef.current.getActiveObjects();
-            // setTimeout(() => {
-            //   bringAllIntoView(60);
-            // }, 1000);
-        });
-
-        fabricCanvasRef.current.on("object:moving", function (object) {
-            const canvas = fabricCanvasRef.current;
-
-            // handleObjectMoving(object);
-
-            const obj = object.target;
-            if (obj.isLine && obj.name == "connectionLine") {
-                obj.set("lockMovementX", true);
-                obj.set("lockMovementY", true);
-                obj.set("lockScalingX", true);
-                obj.set("lockScalingY", true);
-                obj.set("lockScalingFlip", true);
-            }
-            if (obj.isLine) {
-                obj.set("selectable", true);
-            }
-
-            //Snap Start
-            const gridSize = 75;
-            const snapThreshold = 10;
-
-            // Calculate the distance to the nearest grid line for the left and top positions
-            const snapLeft = Math.round(obj.left / gridSize) * gridSize;
-            const snapTop = Math.round(obj.top / gridSize) * gridSize;
-
-            // Check if the object's left position is within the snap threshold
-            if (Math.abs(obj.left - snapLeft) < snapThreshold) {
-                obj.set({ left: snapLeft });
-            }
-
-            // Check if the object's top position is within the snap threshold
-            if (Math.abs(obj.top - snapTop) < snapThreshold) {
-                obj.set({ top: snapTop });
-            }
-
-            // Re-render the canvas to reflect the changes
-            obj.setCoords();
-            //Snap End
-
-            fabricCanvasRef.current.renderAll();
-        });
-        fabricCanvasRef.current.on("mouse:down", function (options) {
-            if (!state.object2) {
-                fabricCanvasRef.current.getObjects().forEach((obj) => {
-                    if (obj.isLine) {
-                        //console.log("object mouse down testing log");
-                        obj.set("selectable", true);
-
-                        obj.set("lockMovementX", true);
-                        obj.set("lockMovementY", true);
-                        obj.set("lockScalingX", true);
-                        obj.set("lockScalingY", true);
-                        obj.set("lockScalingFlip", true);
-                        obj.setCoords();
-                    }
-                });
-                fabricCanvasRef.current.renderAll();
-            }
-        });
-        // Add rotating event listener
-        fabricCanvasRef.current.on("object:rotating", function (options) {
-            // options.target.setCoords(); // Update coordinates
-            // options.target.objectCaching = false;
-            // fabricCanvasRef.current.renderAll();
-            // if(options.target.elementType=="svg"){
-            //     console.log('Object rotation is completed. Final angle1:',options.target.angle);
-            //     initialProperties = {
-            //         id:options.target.id
-            //     };
-            //      console.log('state.rotating',state.rotating);
-            // }
-            // handleObjectMoving(options);
-        });
-        const container = document.querySelector(".canvas-content");
-        container.addEventListener("scroll", () => {
-            // fabricCanvasRef.current.requestRenderAll();
-            updateMinimapViewport();
-            // fabricCanvasRef.current.requestRenderAll();
-        });
-        fabricCanvasRef.current.on("object:removed", updateMinimap);
-        fabricCanvasRef.current.on("viewport:changed", updateMinimap);
-        const handleObjectModified = async (event) => {
-            // await bringAllIntoView(60);
-            const activeGroup = fabricCanvasRef.current.getActiveObjects();
-            activeGroup.forEach((obj) => {
-                if (obj.isLine) {
-                    if (activeGroup.length == 0) {
-                        console.log("modified call", obj);
-                        obj.set("left", obj.oldLeft);
-                        obj.set("top", obj.oldTop);
-                        obj.set("angle", 0);
-                        //console.log("object mouse up testing log");
-                    }
-                }
-            });
-
-            updateMinimap();
-            console.log("updateModifications calling 559");
-            updateModifications(true);
-
-            setTimeout(() => {
-                handleObjectMoving();
-            }, 500);
-
-            return () => {
-                canvas.off("object:moving", handleObjectMoving);
-            };
-        };
-        fabricCanvasRef.current.on("object:modified", handleObjectModified);
-
-        function drawGrid(canvas, gridSize) {
-            const width = canvas.width;
-            const height = canvas.height;
-
-            // Draw vertical lines
-            for (let i = 0; i < width; i += gridSize) {
-                canvas.add(
-                    new fabric.Line([i, 0, i, height], {
-                        stroke: "#ddd",
-                        selectable: false,
-                        name: "grid",
-                    })
-                );
-            }
-
-            // Draw horizontal lines
-            for (let j = 0; j < height; j += gridSize) {
-                canvas.add(
-                    new fabric.Line([0, j, width, j], {
-                        stroke: "#ddd",
-                        selectable: false,
-                        name: "grid",
-                    })
-                );
-            }
-
-            canvas.renderAll();
-        }
-
-        //Zoom ====================================================================
-
-        // fabricCanvasRef.current.on('mouse:wheel', function(opt) {
-        //     var delta = opt.e.deltaY;
-        //     var zoom = fabricCanvasRef.current.getZoom();
-        //     zoom *= 0.999 ** delta;
-        //     if (zoom > 20) zoom = 20;
-        //     if (zoom < 0.01) zoom = 0.01;
-        //     fabricCanvasRef.current.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
-        //     opt.e.preventDefault();
-        //     opt.e.stopPropagation();
-        // });
-
-        // Pan ======================================================================
-        // fabricCanvasRef.current.on('mouse:down', function(opt) {
-        //     var evt = opt.e;
-        //     if (evt.altKey === true) {
-        //       this.isDragging = true;
-        //       this.selection = false;
-        //       this.lastPosX = evt.clientX;
-        //       this.lastPosY = evt.clientY;
-        //     }
-        //   });
-        //   fabricCanvasRef.current.on('mouse:move', function(opt) {
-        //     if (this.isDragging) {
-        //       var e = opt.e;
-        //       var vpt = this.viewportTransform;
-        //       vpt[4] += e.clientX - this.lastPosX;
-        //       vpt[5] += e.clientY - this.lastPosY;
-        //       this.requestRenderAll();
-        //       this.lastPosX = e.clientX;
-        //       this.lastPosY = e.clientY;
-        //     }
-        //   });
-        //   fabricCanvasRef.current.on('mouse:up', function(opt) {
-        //     // on mouse up we want to recalculate new interaction
-        //     // for all objects, so we call setViewportTransform
-        //     this.setViewportTransform(this.viewportTransform);
-        //     this.isDragging = false;
-        //     this.selection = true;
-        //   });
-
-        fabricCanvasRef.current.on(
-            "object:modified",
-            function () {
-                // console.log("updateModifications calling 400");
-                setTimeout(() => {
-                    bringAllIntoView(60);
-                }, 500);
-                updateModifications(true);
-            },
-            "object:added",
-            function () {
-                // console.log("updateModifications calling 405");
-                // setTimeout(() => {
-                // bringAllIntoView(60);
-                // }, 500);
-
-                updateModifications(true);
-            }
-        );
-
-        // Example usage
-        // drawGrid(fabricCanvasRef.current, 75); // Set grid size to 50px
-        // dispatch({ type: 'LINK_OBJECT', payload: false });
-        //Set Index
-        // for (const [key, value] of Object.entries(indexData)) {
-        //   fabricCanvasRef.current.set(value, state.indexValueBus); // change to parent
-        // }
-        fabricCanvasRef.current.set("busIndex", state.indexValueBus); // change to parent
-        fabricCanvasRef.current.set("filterIndex", state.indexValueFilter); // change to parent
-        fabricCanvasRef.current.set(
-            "generatorIndex",
-            state.indexValueGenerator
-        ); // change to parent
-        fabricCanvasRef.current.set(
-            "inductionMotorIndex",
-            state.indexValueInduction
-        ); // change to parent
-        fabricCanvasRef.current.set("loadIndex", state.indexValueLoad); // change to parent
-        fabricCanvasRef.current.set("shuntIndex", state.indexValueShunt); // change to parent
-        fabricCanvasRef.current.set("lineIndex", state.indexValueBus); // change to parent
-        fabricCanvasRef.current.set("transformerIndex", state.indexValueBus); // change to parent
-        // Restore canvas state if savedData exists
-        // if (savedData) {
-        //   fabricCanvas.loadFromJSON(savedData, () => {
-        //     loadCanvas2(savedData);
-        //     fabricCanvas.renderAll();
-        //   });
-        // }
-        // Cleanup on unmount
-
-        return () => {
-            // const currentData = fabricCanvas.toJSON(); // Save the current state
-            // onSave(currentData);
-            // localStorage.setItem(`canvasState_tab${canvasId}`, JSON.stringify(currentData));
-
-            const json = fabricCanvasRef.current.toJSON(allproperties);
-            localStorage.setItem(
-                `canvasState_tab${canvasId}`,
-                JSON.stringify(json)
-            );
-            fabricCanvasRef.current.off(
-                "object:modified",
-                handleObjectModified
-            );
-
-            fabricCanvasRef.current.dispose();
-        };
-    }, [canvasId]);
     function bringAllIntoView() {
         clearTimeout(bringAllTimeout);
         bringAllTimeout = setTimeout(() => {
@@ -1470,18 +1007,6 @@ function FabricCanvas({
         }
     }, [activeObject, isGUIAdded2, state.isGUIAdded]);
 
-    // Load canvas state and reinitialize objects
-    const loadCanvas2 = (canvasData) => {
-        fabricCanvasRef.current.loadFromJSON(canvasData, () => {
-            // fabricCanvasRef.current.renderAll();
-            // Recalculate dynamic properties for all objects
-            fabricCanvasRef.current.getObjects().forEach((obj) => {
-                obj.setCoords(); // This recalculates aCoords, oCoords, etc.
-            });
-            reinitializeObjects();
-        });
-    };
-
     // Reinitialize objects with custom properties and event listeners
     const reinitializeObjects = () => {
         reattachListeners();
@@ -1542,6 +1067,26 @@ function FabricCanvas({
             }
         });
     };
+
+    function refreshCoordsForAll(polyline) {
+        var dims = polyline._calcDimensions();
+        polyline.set({
+            width: dims.width,
+            height: dims.height,
+            left: dims.left,
+            top: dims.top,
+            pathOffset: {
+                x: dims.width / 2 + dims.left,
+                y: dims.height / 2 + dims.top,
+            },
+            dirty: true,
+        });
+        polyline.objectCaching = false; // Disable caching
+        polyline.dirty = true;
+        fabricCanvasRef.current.renderAll(); // Refresh the canvas after updating coords
+    }
+
+
     // Handle mouse:down event
     const handleMouseDown2 = (options) => {
         if (isLinkObjectRef.current) {
@@ -2059,7 +1604,7 @@ function FabricCanvas({
             // groupedObject.on("moving", (event) => updateSPolyline(event,"moving"));
             // groupedObject.on("mouseup", (event) => updateSPolyline(event,"mouseup"));
         });
-    });
+    }, []);
 
     useEffect(() => {
         if (state.redoStack) {
@@ -2246,7 +1791,6 @@ function FabricCanvas({
             fabricCanvasRef.current.renderAll();
             // console.log("updateModifications calling 953");
             updateModifications(true);
-            updateMinimap();
         };
         fabricCanvasRef.current.on("object:added", handleObjectAdded);
 
@@ -2842,7 +2386,8 @@ function FabricCanvas({
 
     const [selectedObject, setSelectedObject] = useState(null);
 
-    const handleDoubleClick = (obj, event) => {
+    const handleDoubleClickOld = (obj, event) => {
+        console.log('double clicked');
         if (isLinkObjectRef.current) {
             dispatch({ type: "SET_ZOOM_ENABLED", payload: false });
             const pointer = fabricCanvasRef.current.getPointer(event.e);
@@ -2883,7 +2428,6 @@ function FabricCanvas({
                 ]);
             }
 
-            updateMinimap();
 
             if (fabricCanvasRef.current.getZoom() > 1) {
                 if (obj === "") {
@@ -2913,16 +2457,50 @@ function FabricCanvas({
                 }
             }
         }
-        // object edit case
         else if (obj?.id) {
             if (obj.elementType === "svg" || obj.elementType === "line") {
-                setSelectedObject(obj); // capture selected object
+                setSelectedObject(obj); 
                 dispatch({ type: "SET_EDIT_POPUP", payload: true });
             }
         }
     };
 
-    //Save Canvas Form Field
+    const handleDoubleClick = (obj, event) => {
+        const canvas = fabricCanvasRef.current;
+        const pointer = canvas.getPointer(event?.e || event);
+
+        if (!obj || obj.type === "rect") {
+            let zoom = canvas.getZoom();
+            zoom += 0.5;
+            if (zoom > 2) zoom = 1;
+
+            canvas.zoomToPoint(pointer, zoom);
+
+            if (zoom !== 1) {
+                canvas.forEachObject(object => {
+                    object.selectable = false;
+                    object.evented = false;
+                });
+            } else {
+                canvas.forEachObject(object => {
+                    object.selectable = true;
+                    object.evented = true;
+                });
+                canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+            }
+
+            canvas.requestRenderAll();
+            setTimeout(() => updateMinimap(), 0);
+
+        } else if (obj?.id) {
+            if (obj.elementType === "svg" || obj.elementType === "line") {
+                setSelectedObject(obj);
+                dispatch({ type: "SET_EDIT_POPUP", payload: true });
+            }
+        }
+    };
+
+
     const formFields = [
         {
             name: "name",
@@ -3451,61 +3029,7 @@ function FabricCanvas({
         );
     };
 
-    const loadCanvas = (canvasData, data) => {
-        var currentCanvas = fabricCanvasRef.current;
-        currentCanvas.clear();
-        currentCanvas.loadFromJSON(
-            canvasData,
-            function () {
-                currentCanvas.renderAll();
-                let boundingRect = currentCanvas.getObjects().reduce(
-                    (bounds, obj) => {
-                        const objBounds = obj.getBoundingRect();
-                        bounds.minX = Math.min(bounds.minX, objBounds.left);
-                        bounds.minY = Math.min(bounds.minY, objBounds.top);
-                        bounds.maxX = Math.max(
-                            bounds.maxX,
-                            objBounds.left + objBounds.width
-                        );
-                        bounds.maxY = Math.max(
-                            bounds.maxY,
-                            objBounds.top + objBounds.height
-                        );
-                        return bounds;
-                    },
-                    {
-                        minX: 0,
-                        minY: 0,
-                        maxX: currentCanvas.width,
-                        maxY: currentCanvas.height,
-                    }
-                );
 
-                // Resize canvas if needed
-                const newWidth = Math.max(
-                    currentCanvas.width,
-                    boundingRect.maxX + 30
-                );
-                const newHeight = Math.max(
-                    currentCanvas.height,
-                    boundingRect.maxY + 30
-                );
-
-                currentCanvas.setWidth(newWidth);
-                currentCanvas.setHeight(newHeight);
-            },
-            function (o, object) {
-                //console.log(o,object)
-            }
-        );
-        console.log("loadCanvas", data);
-        fabricCanvasRef.current.set("storedData", {
-            id: data.id,
-            name: data.name,
-        });
-        fabricCanvasRef.current.renderAll();
-        dispatch({ type: "SET_LOAD_CANVAS", payload: false });
-    };
 
     // Effect to handle updating the canvas when the selectedElement changes
     useEffect(() => {
@@ -5503,14 +5027,8 @@ function FabricCanvas({
         // data.top = oldTop;
         data.points = transformedPoints;
     };
+
     const updatedlinkObject = (object1Id, object2Id, line) => {
-        // console.log("line :::: ", line);
-
-        // console.log("updatedlinkObject Log ==> 4", line);
-        // console.log("object1Id Log ==> 4", object1Id);
-        // console.log("object2Id Log ==> 4", object2Id);
-
-        //console.log("updatedlinkObject");
         const object1 = fabricCanvasRef.current
             .getObjects()
             .filter((obj) => obj.id === object1Id)[0];
@@ -5611,6 +5129,8 @@ function FabricCanvas({
         }
         refreshCoordsForAll(line);
         fabricCanvasRef.current.renderAll();
+
+        updateMinimap();
     };
 
     const swapFirstAndLastCoordinates = (coordinates) => {
@@ -6115,7 +5635,7 @@ function FabricCanvas({
             generateOutputFromEngine();
         }
         if (state.isMinMapEnabled) {
-            addMinimap();
+            updateMinimap();
         }
     }, [
         state.isLoadCanvas,
@@ -6995,7 +6515,7 @@ function FabricCanvas({
                 fabricCanvasRef.current.systemConfiguration,
                 fabricCanvasRef.current.engineInputURL,
                 fabricCanvasRef.current.engineInputFolderName
-            ); // Call the utility function
+            ); 
             dispatch({ type: "GENERATE_INPUT", payload: false });
             setDataToOutput(null);
             if (result && !state.executedEngine) {
@@ -7006,18 +6526,45 @@ function FabricCanvas({
             }
         }
         if (dataToExcel) {
-            generateExcelFile(dataToExcel); // Call the utility function
+            generateExcelFile(dataToExcel);
             dispatch({ type: "EXPORT_EXCEL", payload: false });
             setDataToExcel(null);
         }
     }, [dataToOutput, dataToExcel]);
-    // Scroll to the beginning on initial render
+
     useEffect(() => {
         const canvasWrapper = document.getElementById("canvasWrapper");
         if (canvasWrapper) {
-            canvasWrapper.scrollLeft = 0; // Ensure the scrollbar starts at the beginning
+            canvasWrapper.scrollLeft = 0;
         }
-    }, []); // Run only once on mount
+    }, []);
+
+
+
+        useEffect(() => {
+            const canvasWidth = selectedCanvas?.canvas_object?.width;
+            const windowWidth = window.innerWidth;
+
+            if (typeof canvasWidth === "number" && !isNaN(canvasWidth)) {
+                const targetWidth = canvasWidth + 200;
+                let newWidth = 1500;
+
+                if (targetWidth < 1500) {
+                    newWidth = 1500;
+                } else if (windowWidth >= targetWidth) {
+                    newWidth = targetWidth;
+                } else {
+                    newWidth = windowWidth;
+                }
+
+                setCanvasContainerWidth(newWidth);
+            } else {
+                setCanvasContainerWidth(1500);
+            }
+        }, [selectedCanvas]); 
+
+
+        console.log("canvasContainerWidth :",canvasContainerWidth);
 
     return (
         <>
@@ -7026,9 +6573,20 @@ function FabricCanvas({
                     ref={canvasRef}
                     className="rrrr"
                     id="mainCanvas"
-                    width={1150}
-                    height={800}
+                    width={canvasContainerWidth}
+                    height={canvasContainerHeight}
                 />
+
+                {selectedCanvas && (
+                    <CanvasLoader
+                    canvasRef={fabricCanvasRef}
+                    canvasData={selectedCanvas.canvas_object}
+                    data={selectedCanvas}
+                    dispatch={dispatch}
+                    onLoad={() => updateMinimap()}
+                    secondOnLoad={onCanvasLoaded}
+                    />
+                )}
                 <div
                     id="right"
                     style={{
@@ -7036,13 +6594,16 @@ function FabricCanvas({
                     }}
                 >
                     <canvas
-                        ref={minimapRef}
-                        id="minimap"
-                        width="300"
-                        height="300"
-                    ></canvas>
+                    ref={minimapRef}
+                    id="minimap"
+                    width="300"
+                    height="300"
+                    />
+
                 </div>
-            </div>
+            </div>  
+
+
             <Popup
                 isOpen={state.isPopupOpen}
                 onClose={() =>
@@ -7217,14 +6778,7 @@ function FabricCanvas({
                                         />
                                     </td>
                                     <td>
-                                        <button
-                                            onClick={() =>
-                                                loadCanvas(
-                                                    list.canvas_object,
-                                                    list
-                                                )
-                                            }
-                                        >
+                                        <button onClick={() => setSelectedCanvas(list)}>
                                             Load
                                         </button>
                                     </td>
