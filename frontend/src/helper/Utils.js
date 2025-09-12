@@ -14,21 +14,22 @@ export const Encrypt = {
 };
 
 export const NameGenerateString = (prefix, number) => {
-    // Convert the number to a string and pad it with leading zeros
-    const paddedNumber = number.toString().padStart(8, "0");
-    // Concatenate the prefix with the padded number
-    return `${prefix}-${paddedNumber}`;
+    const safePrefix = prefix ?? "Name";
+    const safeNumber = Number.isFinite(number) ? number : 0;
+    const paddedNumber = safeNumber.toString().padStart(8, "0");
+    return `${safePrefix}-${paddedNumber}`;
 };
+
 
 export const addProperties = (data, index) => {
     const properties = data.properties;
     var updatedData = properties
-        ?.sort((a, b) => a.orderProperties - b.orderProperties)
-        ?.map((property) => {
-            let currentValue;
-            if (property.isIncremental) {
-                if (property.propertyType.toLowerCase() === "integer") {
-                    currentValue = index;
+    ?.sort((a, b) => a.orderProperties - b.orderProperties)
+    ?.map((property) => {
+        let currentValue;
+        if (property.isIncremental) {
+            if (property.propertyType.toLowerCase() === "integer") {
+                currentValue = index;
                 } else if (property.propertyType.toLowerCase() === "string") {
                     if (
                         [
@@ -217,24 +218,25 @@ export const getDataAsFormFields = (data, elements) => {
     return formFields;
 };
 
-export const comparePropertyValue = (obj1, obj2, propertyName) => {
-    // Find the property in object1 that matches the given propertyName
-    const prop1 = obj1.find((prop) => prop.propertyName === propertyName);
-    // Find the property in object2 that matches the given propertyName
-    const prop2 = obj2.find((prop) => prop.propertyName === propertyName);
-    // If both properties are found, compare their propertyValue
-    if (prop1 && prop2) {
-        if ("fBuskV" == propertyName) {
-            return (
-                parseFloat(prop1.propertyValue) ===
-                parseFloat(prop2.propertyValue)
-            );
+    export const comparePropertyValue = (obj1, obj2, propertyName) => {
+        if (!Array.isArray(obj1) || !Array.isArray(obj2)) {
+            console.warn("comparePropertyValue: one of the objects is not an array", { obj1, obj2 });
+            return false;
         }
-        return prop1.propertyValue === prop2.propertyValue;
-    }
-    // If the property is not found in one or both objects, return false
-    return false;
-};
+
+        const prop1 = obj1.find((prop) => prop.propertyName === propertyName);
+        const prop2 = obj2.find((prop) => prop.propertyName === propertyName);
+
+        if (prop1 && prop2) {
+            if (propertyName === "fBuskV") {
+                return parseFloat(prop1.propertyValue) === parseFloat(prop2.propertyValue);
+            }
+            return prop1.propertyValue === prop2.propertyValue;
+        }
+
+        return false;
+    };
+
 
 export const filterObjectByType = (objects, type) => {
     const data = objects.filter((el) => el.elementType === type);

@@ -61,6 +61,15 @@ function CanvasLoader({ canvasRef, canvasData, data, dispatch,onLoad,secondOnLoa
                     return;
                 }
 
+                currentCanvas.getObjects().forEach(obj => {
+                    obj.set({
+                        selectable: true,
+                        evented: true
+                    });
+                });
+                currentCanvas.renderAll();
+
+
                 const padding = 30;
                 let boundingRect = currentCanvas.getObjects().reduce(
                     (bounds, obj) => {
@@ -82,15 +91,18 @@ function CanvasLoader({ canvasRef, canvasData, data, dispatch,onLoad,secondOnLoa
                 const contentWidth = Math.max(boundingRect.maxX , currentCanvas.width);
                 const contentHeight = Math.max(boundingRect.maxY , currentCanvas.height);
 
-                console.log("contentHeight :", contentHeight);
-                console.log("boundingRect.maxY :", boundingRect.maxY);
-                console.log("currentCanvas.width",currentCanvas.width );
-                console.log("contentWidth :", contentWidth);
-                console.log("boundingRect.maxX :", boundingRect.maxX);
+                // console.log("contentHeight :", contentHeight);
+                // console.log("boundingRect.maxY :", boundingRect.maxY);
+                // console.log("currentCanvas.width",currentCanvas.width );
+                // console.log("contentWidth :", contentWidth);
+                // console.log("boundingRect.maxX :", boundingRect.maxX);
 
                 
                 currentCanvas.setWidth(contentWidth);
                 currentCanvas.setHeight(contentHeight);
+
+                // currentCanvas.setZoom(0.8); 
+                // currentCanvas.absolutePan(new fabric.Point(100, 100));
 
                 currentCanvas.set("contentBounds", {
                     width: contentWidth,

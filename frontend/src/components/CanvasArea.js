@@ -85,13 +85,13 @@ function CanvasArea({ selectedElement }) {
         };
 
         const saveCanvasState = (canvasId, data) => {
-                setCanvases((prev) =>
-                        prev.map((canvas) =>
-                                canvas.id === canvasId
-                                        ? { ...canvas, data }
-                                        : canvas
-                        )
-                );
+            setCanvases((prev) =>
+                prev.map((canvas) =>
+                    canvas.id === canvasId
+                        ? { ...canvas, data }
+                        : canvas
+                )
+            );
         };
 
         const registerCanvas = (canvasId, canvasInstance) => {
@@ -141,32 +141,15 @@ function CanvasArea({ selectedElement }) {
                                 {canvases.map((canvas) =>
                                         activeTab === canvas.id ? (
                                                 <FabricCanvas
+                                                        refdata={containerRef}
                                                         key={canvas.id}
                                                         canvasId={canvas.id}
-                                                        selectedElement={
-                                                                selectedElement
-                                                        }
+                                                        selectedElement={selectedElement}
                                                         savedData={canvas.data}
-                                                        onSave={(data) =>
-                                                                saveCanvasState(
-                                                                        canvas.id,
-                                                                        data
-                                                                )
-                                                        }
+                                                        onSave={(data) =>saveCanvasState(canvas.id,data)}
                                                         onCanvasLoaded={handleCanvasLoaded}
-                                                        onRegister={(
-                                                                canvasInstance
-                                                        ) =>
-                                                                registerCanvas(
-                                                                        canvas.id,
-                                                                        canvasInstance
-                                                                )
-                                                        }
-                                                        handleCopy={() =>
-                                                                canvasInstances.current[
-                                                                        activeTab
-                                                                ].copy()
-                                                        }
+                                                        onRegister={(canvasInstance) =>registerCanvas(canvas.id,canvasInstance)}
+                                                        handleCopy={() =>canvasInstances.current[activeTab].copy()}
                                                         handlePaste={() => {
                                                                 if (
                                                                         copiedSelectedObject
@@ -183,12 +166,8 @@ function CanvasArea({ selectedElement }) {
                                                                         canvasInstance.renderAll();
                                                                 }
                                                         }}
-                                                        activeObject={
-                                                                copiedSelectedObject
-                                                        }
-                                                        canvasInstances={
-                                                                canvasInstances.current
-                                                        }
+                                                        activeObject={copiedSelectedObject}
+                                                        canvasInstances={canvasInstances.current}
                                                         activeTab={activeTab}
                                                 />
                                         ) : null
