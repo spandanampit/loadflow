@@ -305,34 +305,38 @@ function ColumnOne({ onElementSelect }) {
         <div className="properties-panel">
           {openSections[3] && (
             <table>
-              <tbody>
-                {/* Filter duplicates and display only the last dynamicFields */}
-                {[
-                  ...new Map(
-                    state.elementPropertyData?.canvasProperty?.map((item) => [
-                      item.propertyName,
-                      item,
-                    ])
-                  ).values(),
-                ].map((item, i) => (
-                  <div key={i}>
-                    {item.dynamicFields?.map((dynamicField, j) => (
-                      <table key={j}>
-                        <tbody>
-                          <p>Additional Field: {j + 1}</p>
-                          {Object.entries(dynamicField).map(([key, value]) => (
-                            <tr key={key}>
-                              <td>{labelMapping[key] || key} </td> <td> : </td>
-                              <td>{value} </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ))}
-                  </div>
-                ))}
-              </tbody>
-            </table>
+  <tbody>
+    {[
+      ...new Map(
+        state.elementPropertyData?.canvasProperty?.map((item) => [
+          item.propertyName,
+          item,
+        ])
+      ).values(),
+    ].map((item, i) => (
+      <React.Fragment key={i}>
+        {item.dynamicFields?.map((dynamicField, j) => (
+          <React.Fragment key={j}>
+            {/* Use a <tr> + <td> for the "Additional Field" text */}
+            <tr>
+              <td colSpan={3}>
+                <strong>Additional Field: {j + 1}</strong>
+              </td>
+            </tr>
+            {Object.entries(dynamicField).map(([key, value]) => (
+              <tr key={key}>
+                <td>{labelMapping[key] || key}</td>
+                <td>:</td>
+                <td>{value}</td>
+              </tr>
+            ))}
+          </React.Fragment>
+        ))}
+      </React.Fragment>
+    ))}
+  </tbody>
+</table>
+
           )}
         </div>
       )}

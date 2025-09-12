@@ -15,6 +15,7 @@ const DynamicForm = ({ fields, onSubmit, canvasInstance }) => {
 
     const [formData, setFormData] = useState(
         fields.reduce((acc, field) => {
+            //     console.log(`acc-${acc},filed-${field}`);
             if (!field.dynamicField) {
                 acc[field.name] = field.value || "";
             } else {
@@ -88,10 +89,6 @@ const DynamicForm = ({ fields, onSubmit, canvasInstance }) => {
 
         function validateField(field, value, propertyType) {
             if (propertyType === "integer") {
-                if(field.name === "iStatus"){
-                    console.log("feild.value :::: ", field.value);
-                    field.minValue = 0;
-                }
                 const intValue = parseInt(value, 10);
                 if (
                     value === "" &&
@@ -898,7 +895,7 @@ const DynamicForm = ({ fields, onSubmit, canvasInstance }) => {
                                                     : ""
                                             }
                                             //value={field.value}
-                                            readOnly={field.name == "iUnitNo" ? false : !field.isEditable}
+                                            readOnly={!field.isEditable}
                                             onChange={(e) =>
                                                 handleInputChange(e, field)
                                             }

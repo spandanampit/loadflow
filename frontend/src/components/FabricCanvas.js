@@ -47,7 +47,8 @@ function FabricCanvas({
     onRegister,
     activeTab,
     canvasInstances,
-    onCanvasLoaded
+    onCanvasLoaded,
+    refdata
 }) {
     const canvasRef = useRef(null);
     const minimapRef = useRef(null);
@@ -170,11 +171,10 @@ function FabricCanvas({
 
     const [selectedCanvas, setSelectedCanvas] = useState(null);
 
-    
 
     useEffect(() => {
         if (propertyVisible.current !== state.isPropertiesBarVisible) {
-            propertyVisible.current = state.isPropertiesBarVisible; // Update ref to match state
+            propertyVisible.current = state.isPropertiesBarVisible;
             handleVisibilityChange(state.isPropertiesBarVisible);
         }
     }, [state.isPropertiesBarVisible]);
@@ -188,6 +188,10 @@ function FabricCanvas({
             fabricCanvasRef.current.setWidth(currentWidth + 330);
         }
     };
+
+    useEffect(() => {
+        isLinkObjectRef.current = state.isLinkObject;
+    }, [state.isLinkObject]);
 
     // Deactived the active element
     useEffect(() => {
@@ -203,21 +207,38 @@ function FabricCanvas({
     //Search Function ===============================
     useEffect(() => {
         if (state.searchValue.length > 3) {
-            const allObjects = fabricCanvasRef.current.getObjects();
+            console.log('search :', state.searchValue.toLowerCase());
+            const canvas = fabricCanvasRef.current;
+            const allObjects = canvas.getObjects();
+
             const filterObject = allObjects.find(
                 (el) =>
-                    el.elementType == "svg" &&
-                    el.canvasProperty[1].propertyValue.toLowerCase() ==
+                    el.elementType === "svg" &&
+                    el.canvasProperty[1].propertyValue.toLowerCase() ===
                         state.searchValue.toLowerCase()
-            ); //&& el.canvasProperty[1]==state.searchValue.toLowerCase()
+            );
+
             if (filterObject) {
-                const canvas = fabricCanvasRef.current;
                 canvas.setActiveObject(filterObject);
                 filterObject.set("active", true);
                 canvas.renderAll();
+
+                const bounding = filterObject.getBoundingRect();
+
+                const container = refdata.current;
+
+                if (container) {
+                    container.scrollTo({
+                        top: bounding.top - container.clientHeight / 2 + bounding.height / 2,
+                        left: bounding.left - container.clientWidth / 2 + bounding.width / 2,
+                        behavior: "smooth",
+                    });
+                }
             }
+
         }
     }, [state.searchValue]);
+
 
     const addHashPrefix = (color) => {
         const namedColors = [
@@ -712,7 +733,7 @@ function FabricCanvas({
         state.clicked,
         state.dropped,
         state.position,
-        state.isEditPopupOpen,
+        // state.isEditPopupOpen,
         state.selectedElement,
     ]); // Dependency on selected element and bus objects
 
@@ -1043,6 +1064,7 @@ function FabricCanvas({
 
             // Attach mousedown listener only for buses
             if (object.elementCategory === "Bus") {
+                console.log('bus is moving')
                 // updateModifications(true);
                 object.on("mousedown", () => {
                     console.log("Bus clicked!");
@@ -1057,7 +1079,7 @@ function FabricCanvas({
                 );
             }
             if (object.elementCategory === "Two winding transformer") {
-                // object.on("mousedown", handleMouseDown);
+                object.on("mousedown", handleMouseDown);
                 object.on("moving", (event) =>
                     updateSPolyline(event, "moving")
                 );
@@ -1260,95 +1282,38 @@ function FabricCanvas({
                         payload: newPolyline,
                     });
                 } else if (!state.object2) {
-                    if (state.object1.id != options.target.id) {
-                        const isEqual = comparePropertyValue(
-                            options.target.canvasProperty,
-                            state.object1.canvasProperty,
-                            "fBuskV"
-                        );
-                        if (!isEqual) {
-                            const elements =
-                                fabricCanvasRef.current.getObjects();
-                            const getLineObject = elements.find(
-                                (data) => data.id == state.activePolyline.id
-                            );
-                            getLineObject?.set("testAttr", "hello");
-                            console.log("getLineObject", getLineObject);
-                            console.log(
-                                "getLineObject-flag",
-                                fabricCanvasRef.current.contains(getLineObject)
-                            );
-                            fabricCanvasRef.current.forEachObject(function (
-                                obj
-                            ) {
-                                if (obj.id == state.activePolyline.id) {
-                                    fabricCanvasRef.current.remove(obj);
-                                    fabricCanvasRef.current.requestRenderAll();
-                                }
-                            });
-                            fabricCanvasRef.current.setActiveObject(
-                                getLineObject
-                            );
-                            dispatch({
-                                type: "SET_OBJECT_1",
-                                payload: null,
-                            });
-                            dispatch({
-                                type: "SET_OBJECT_2",
-                                payload: null,
-                            });
-                            dispatch({
-                                type: "LINK_OBJECT",
-                                payload: false,
-                            });
-                            dispatch({
-                                type: "SET_CURRENT_LINE",
-                                payload: null,
-                            });
-                            fabricCanvasRef.current.discardActiveObject();
-                            fabricCanvasRef.current.requestRenderAll();
-                            setTimeout(() => {
-                                alert(
-                                    "Failed! Two buses having different Voltage."
-                                );
-                            }, 500);
-                            return false;
-                        } else {
-                            options.target.setCoords();
+                    if (state.object1.id !== options.target.id) {
+                        options.target.setCoords();
+                        state.object1.setCoords();
+                        fabricCanvasRef.current.renderAll();
+
+                        const obj1Center = state.object1.getCenterPoint();
+                        const obj2Center = options.target.getCenterPoint();
+
+                        // Force the polyline points to both centers
+                        if (state.activePolyline) {
+                            const points = [
+                                { x: obj1Center.x, y: obj1Center.y },
+                                { x: obj2Center.x, y: obj2Center.y }
+                            ];
+                            state.activePolyline.set({ points });
+                            state.activePolyline.setCoords();
                             fabricCanvasRef.current.renderAll();
-                            var pointer = options.target.getLocalPointer();
-                            //console.log("pointer", pointer);
-                            const rect =
-                                canvasRef.current.getBoundingClientRect();
-                            //console.log(rect);
-
-                            dispatch({
-                                type: "SET_OBJECT_2",
-                                payload: options.target,
-                            });
-                            dispatch({
-                                type: "LINK_OBJECT",
-                                payload: false,
-                            });
-
-                            createPolyline(
-                                state.object1,
-                                options.target,
-                                intermediaryPoints,
-                                state.object1.id + "-line",
-                                options
-                            );
-
-                            dispatch({
-                                type: "SET_CURRENT_LINE",
-                                payload: null,
-                            });
-                            console.log("updateModifications calling 856");
-                            updateModifications(true);
-                            intermediaryPoints = [];
                         }
+
+                        dispatch({ type: "SET_OBJECT_2", payload: options.target });
+                        dispatch({ type: "LINK_OBJECT", payload: false });
+
+                        createPolyline(
+                            state.object1,
+                            options.target,
+                            [],
+                            state.object1.id + "-line",
+                            options
+                        );
                     }
                 }
+
             } else if (state.object1) {
                 //!options.target &&
                 console.log("state.activePolyline", state.activePolyline);
@@ -1640,6 +1605,7 @@ function FabricCanvas({
             : firstObjectCenter;
 
         if ([90, -270].includes(firstObject.angle)) {
+            console.log("A ==========")
             LineStartingPoints = obj1Pointer
                 ? {
                       x: state.object1.left - obj1Pointer.x,
@@ -1648,6 +1614,8 @@ function FabricCanvas({
                 : firstObjectCenter;
         }
         if ([270, -90].includes(firstObject.angle)) {
+            console.log("B ==========")
+
             LineStartingPoints = obj1Pointer
                 ? {
                       x: state.object1.left + obj1Pointer.x,
@@ -1664,6 +1632,8 @@ function FabricCanvas({
             : secondObjectCenter;
 
         if ([90, -270].includes(secondObject.angle)) {
+            console.log("C ==========")
+
             LineEndingPoints = getPointer
                 ? {
                       x: secondObjectCenter.x,
@@ -1675,6 +1645,8 @@ function FabricCanvas({
             console.log("LineEndingPoints.getPointer", getPointer);
         }
         if ([-90, 270].includes(secondObject.angle)) {
+            console.log("D ==========")
+
             LineEndingPoints = getPointer
                 ? {
                       x: secondObject.left + getPointer.x,
@@ -1758,8 +1730,20 @@ function FabricCanvas({
             fabricCanvasRef.current.requestRenderAll();
         }
 
-        firstObject.connectingLine.push(currentPlyline?.id);
-        secondObject.connectingLine.push(currentPlyline?.id);
+        if (firstObject) {
+            if (!Array.isArray(firstObject.connectingLine)) {
+                firstObject.connectingLine = [];
+            }
+            firstObject.connectingLine.push(currentPlyline?.id);
+        }
+
+        if (secondObject) {
+            if (!Array.isArray(secondObject.connectingLine)) {
+                secondObject.connectingLine = [];
+            }
+            secondObject.connectingLine.push(currentPlyline?.id);
+        }
+
 
         currentPlyline.set("fromObjectId", firstObject.id);
         currentPlyline.set("toObjectId", secondObject.id);
@@ -1825,11 +1809,17 @@ function FabricCanvas({
                 // console.log("no1 :::::::::::::::::::");
                 fabricCanvasRef.current.getObjects().forEach((obj) => {
                     if (obj.elementCategory !== "Bus") {
-                        if (obj.orSelectable) obj.selectable = obj.orSelectable;
-                        if (obj.orEvented) obj.evented = obj.orEvented;
+                        obj.selectable = true;
+                        obj.evented = true;
                     }
                 });
+
             }
+
+            // fabricCanvasRef.current.getObjects().forEach((obj) => {
+            //     console.log(obj.type, obj.elementCategory, obj.selectable, obj.evented);
+            // });
+
             const target = fabricCanvasRef.current.findTarget(options.e, true);
             //  console.log("options.target==>target:",target);
             // console.log("options.target",options.target);
@@ -1879,6 +1869,7 @@ function FabricCanvas({
             }
 
             const currentIsLinkObject = isLinkObjectRef.current;
+            console.log('currentIsLinkObject :', currentIsLinkObject);
 
             if (currentIsLinkObject) {
                 if (options.target && state.object1) {
@@ -1901,16 +1892,8 @@ function FabricCanvas({
                     }
                 }
 
-                // fabricCanvasRef.current.selection = false;
-                // fabricCanvasRef.current.forEachObject((o) => {
-                //     o.selectable = false;
-                // });
-
-                if (
-                    options.target &&
-                    options.target.name !== "grid" &&
-                    options.target.name !== "connectionLine"
-                ) {
+                if (options.target && options.target.name !== "grid" && options.target.name !== "connectionLine") {
+                    console.log("1 -------------------------------------");
                     if (!state.object1) {
                         if (state.isSelectedTransformer) {
                             getBusDataForTransformer(options.target);
@@ -2040,22 +2023,20 @@ function FabricCanvas({
                         }
 
                         fabricCanvasRef.current.add(newPolyline);
-                        newPolyline.setCoords();
-
-                        newPolyline.setCoords();
                         fabricCanvasRef.current.sendToBack(newPolyline); //arasu
                         newPolyline.setCoords();
+
                         fabricCanvasRef.current.renderAll();
                         if (newPolyline.group) {
                             console.error(
                                 "Polyline is part of a group. Move the group instead."
                             );
                         }
-                        fabricCanvasRef.current.renderAll();
                         dispatch({
                             type: "SET_CURRENT_LINE",
                             payload: newPolyline,
                         });
+                        fabricCanvasRef.current.renderAll();
                     } else if (!state.object2) {
                         if (state.object1.id != options.target.id) {
                             const isEqual = comparePropertyValue(
@@ -2064,6 +2045,8 @@ function FabricCanvas({
                                 "fBuskV"
                             );
                             if (!isEqual && !state.isSelectedTransformer) {
+                                console.log("nokol mal");
+
                                 const elements =
                                     fabricCanvasRef.current.getObjects();
                                 const getLineObject = elements.find(
@@ -2107,6 +2090,7 @@ function FabricCanvas({
                                 }, 500);
                                 return false;
                             } else {
+                                console.log("asol mal");
                                 options.target.setCoords();
                                 fabricCanvasRef.current.renderAll();
                                 var pointer = options.target.getLocalPointer();
@@ -2193,6 +2177,8 @@ function FabricCanvas({
                         }
                     }
                 } else if (state.object1) {
+                    console.log("2-------------------------------------");
+
                     //!options.target &&
                     console.log("state.activePolyline", state.activePolyline);
                     state.activePolyline.set("selectable", false);
@@ -2277,6 +2263,7 @@ function FabricCanvas({
                 fabricCanvasRef.current.selection = true;
             }
         };
+        
         // Attach the mouse:down event only once when the component mounts
         fabricCanvasRef.current.on("mouse:down", handleMouseDown);
         return () => {
@@ -2496,10 +2483,13 @@ function FabricCanvas({
             if (obj.elementType === "svg" || obj.elementType === "line") {
                 setSelectedObject(obj);
                 dispatch({ type: "SET_EDIT_POPUP", payload: true });
+
+                if (fabricCanvasRef.current) {
+                    fabricCanvasRef.current.requestRenderAll();
+                }
             }
         }
     };
-
 
     const formFields = [
         {
@@ -2596,6 +2586,8 @@ function FabricCanvas({
     };
 
     const updateCanvasData = (formData, id) => {
+        console.log("id for update canvas :",id)
+        console.log("form data for update canvas :", formData)
         var currentCanvas = fabricCanvasRef.current;
         var base64Data = currentCanvas.toDataURL();
         var objectJsonData = JSON.stringify(
@@ -2618,8 +2610,8 @@ function FabricCanvas({
         );
     };
 
-    //Save Canvas Form Submit
     const handleFormSubmit = (formData) => {
+        console.log("formData :", formData);
         var currentCanvas = fabricCanvasRef.current;
         if (formData) {
             if (currentCanvas.storedData) {
@@ -2631,7 +2623,6 @@ function FabricCanvas({
         dispatch({ type: "SET_POPUP", payload: false });
     };
 
-    //Save Canvas Form Submit
     const handleSaveAsFormSubmit = (formData) => {
         var currentCanvas = fabricCanvasRef.current;
         if (formData) {
@@ -2640,7 +2631,6 @@ function FabricCanvas({
         dispatch({ type: "SET_SAVEAS_CANVAS", payload: false });
     };
 
-    //Save Engine URL Form Submit
     const handleSaveAsEngineFormSubmit = (formData) => {
         var currentCanvas = fabricCanvasRef.current;
         if (formData) {
@@ -2655,45 +2645,72 @@ function FabricCanvas({
         dispatch({ type: "SET_ENGINE_URL", payload: false });
     };
 
-    //Save Object Data
     const handleObjectFormSubmit = (formData, dynamicFields) => {
-        var getActiveObject = fabricCanvasRef.current.getActiveObject();
-        if (getActiveObject) {
-            getActiveObject.set(
-                "canvasProperty",
-                updateProperties(
-                    getActiveObject.canvasProperty,
-                    formData,
-                    dynamicFields
-                )
-            );
+        console.log("formData :", formData);
+        console.log("dynamicFields :", dynamicFields);
 
-            const allObjects = fabricCanvasRef.current.getObjects();
-            const getText = allObjects.find(
-                (data) => data.id == getActiveObject.textId
+        const currentCanvas = fabricCanvasRef.current;
+        const getActiveObject = currentCanvas.getActiveObject();
+        const storedData = currentCanvas.storedData;
+        console.log("getActiveObject :",getActiveObject);
+        if (!getActiveObject) return;
+
+        let updatedProps = getActiveObject.canvasProperty.map((prop) => {
+            const newValue = formData[prop.propertyName];
+            if (newValue !== undefined) {
+                return {
+                    ...prop,
+                    value: newValue,
+                    propertyValue: newValue,
+                };
+            }
+            return prop;
+        });
+
+        if (dynamicFields?.length > 0) {
+            updatedProps = updateProperties(
+                updatedProps,
+                formData,
+                dynamicFields
             );
-            if (formData[getActiveObject.canvasProperty[1]?.propertyName]) {
-                getText?.set(
-                    "text",
-                    formData[getActiveObject.canvasProperty[1].propertyName]
-                );
-                fabricCanvasRef.current.renderAll();
-            }
-            if (getActiveObject.elementCategory == "Bus") {
-                const getObjectLists = getConnectedObjectToBus(
-                    getActiveObject,
-                    allObjects
-                );
-                const getShuntObject = allObjects.filter((data) =>
-                    getObjectLists.includes(data.id)
-                );
-                getShuntObject.forEach((obj) => {
-                    UpdatedBusName(getActiveObject, obj);
-                });
-            }
         }
+
+        console.log("updatedProps :", updatedProps);
+        getActiveObject.set("canvasProperty", updatedProps);
+
+        const allObjects = fabricCanvasRef.current.getObjects();
+        const getText = allObjects.find(
+            (data) => data.id == getActiveObject.textId
+        );
+        if (formData[getActiveObject.canvasProperty[1]?.propertyName]) {
+            getText?.set(
+            "text",
+            formData[getActiveObject.canvasProperty[1].propertyName]
+            );
+            fabricCanvasRef.current.renderAll();
+        }
+
+        getActiveObject.setCoords();
+        fabricCanvasRef.current.requestRenderAll();
+
+        if (getActiveObject.elementCategory === "Bus") {
+            const getObjectLists = getConnectedObjectToBus(
+                getActiveObject,
+                allObjects
+            );
+            const getShuntObject = allObjects.filter((data) =>
+                getObjectLists.includes(data.id)
+            );
+            getShuntObject.forEach((obj) => {
+                UpdatedBusName(getActiveObject, obj);
+            });
+        }
+
         dispatch({ type: "SET_EDIT_POPUP", payload: false });
+        //update data
+        handleFormSubmit(storedData.name);
     };
+
 
     //Update the font size Form Submit
     const handleFontFormSubmit = (formData) => {
@@ -5039,6 +5056,8 @@ function FabricCanvas({
         const checkObjects = checkObjectCategories(object1, object2);
 
         // console.log("checkObjects", {checkObjects,line});
+        object1.setCoords();
+        object2.setCoords();
 
         let points = postionFunc.getCoordBtwObjects(object1, object2, line);
         if (checkObjects !== false) {
@@ -5067,15 +5086,6 @@ function FabricCanvas({
         }
 
         if (object1.elementCategory == "Two winding transformer") {
-            console.log(
-                "Two winding transformer condition",
-                line.busPointerData
-            );
-            // points = postionFunc.getCoordBtwObjectsAndTransformer(
-            //   object1,
-            //   object2,
-            //   line.busPointerData
-            // );
             points = postionFunc.getCoordBtwTransformer(object1, object2, line);
             if (!line.isBusTwo) {
                 points = swapFirstAndLastCoordinates(points);
@@ -5085,7 +5095,6 @@ function FabricCanvas({
             updateGenerateOutputText(line, object2);
         }
         if (line.angle == 90) {
-            //arasu
             line.set("angle", 0);
             line.oldPoints = line.points;
             console.log(" points :::: ", line.points[0]);
@@ -5161,13 +5170,17 @@ function FabricCanvas({
         transformedPoints,
         oldLine = null
     ) => {
+        fabricCanvasRef.current.requestRenderAll();
+        object1.setCoords();
+        object2.setCoords();
         const checkVaild = validatedLink(object1, object2);
+        
         if (checkVaild) {
             let points = postionFunc.getCoordBtwObjectsAndBus(object1, object2);
-            console.log("shunt elements points updating here *** ");
+            
             if (object1.elementCategory == "Two winding transformer") {
                 points = transformedPoints;
-
+            
                 var busName = object2.canvasProperty[1].propertyValue;
                 let property = object1.canvasProperty.find(
                     (item) => item.propertyName === "sHVBusName"
@@ -5178,14 +5191,18 @@ function FabricCanvas({
                     );
                 }
                 property.propertyValue = busName;
+                console.log("busName :",busName)
             }
             if (object2.elementCategory == "Two winding transformer") {
                 points = transformedPoints;
             }
-            console.log("points", { points, getBus });
-            const obj1ConnectingLine = object1.connectingLine;
-            const obj2ConnectingLine = object2.connectingLine;
-            console.log("oldLine :::: ", oldLine);
+            // console.log("points", { points, getBus });
+            const obj1ConnectingLine = object1.connectingLine || [];
+            const obj2ConnectingLine = object2.connectingLine || [];
+
+            console.log('obj1ConnectingLine :', obj1ConnectingLine);
+            console.log("obj2ConnectingLine :", obj2ConnectingLine);
+            // console.log("oldLine :::: ", oldLine);
 
             // Create the polyline
             var lineId = uuidv4();
@@ -5290,14 +5307,24 @@ function FabricCanvas({
             });
 
             // addTextAboveObject(polyline,polyline.name);
-            object1.set("connectingLine", [
-                ...obj1ConnectingLine,
-                polyline.lineId,
-            ]);
-            object2.set("connectingLine", [
-                ...obj2ConnectingLine,
-                polyline.lineId,
-            ]);
+            // set metadata first
+            object1.set("connectingLine", [...obj1ConnectingLine, polyline.lineId]);
+            object2.set("connectingLine", [...obj2ConnectingLine, polyline.lineId]);
+
+            // then add the line
+            fabricCanvasRef.current.add(polyline);
+            polyline.moveTo(0);
+            fabricCanvasRef.current.requestRenderAll();
+
+            console.log("Final connections >>>", {
+                obj1: object1.id,
+                obj1Lines: object1.connectingLine,
+                obj2: object2.id,
+                obj2Lines: object2.connectingLine,
+                polyline: polyline.lineId
+            });
+
+            updatedlinkObject(object1.id,object2.id, polyline );
 
             return polyline;
 
@@ -6564,7 +6591,7 @@ function FabricCanvas({
         }, [selectedCanvas]); 
 
 
-        console.log("canvasContainerWidth :",canvasContainerWidth);
+        // console.log("canvasContainerWidth :",canvasContainerWidth);
 
     return (
         <>
@@ -6646,7 +6673,7 @@ function FabricCanvas({
                 isOpen={state.isEditPopupOpen}
                 onClose={() => {
                     dispatch({ type: "SET_EDIT_POPUP", payload: false });
-                    setSelectedObject(null); // clear after close
+                    setSelectedObject(null);
                 }}
                 title={
                     selectedObject
