@@ -1538,38 +1538,106 @@ function FabricCanvas({
     };
 
     useEffect(() => {
-        fabricCanvasRef.current.on("object:moving", function (event) {
-            // const activeGroup = fabricCanvasRef.current.getActiveObjects();
-            // activeGroup.forEach(obj => {
-            //   if(obj.isLine){
-            //     if (activeGroup.length == 0) {
-            //     console.log("modified call",obj);
-            //     obj.set("left",obj.oldLeft);
-            //     obj.set("top",obj.oldTop);
-            //     obj.set("angle",0);
-            //     //console.log("object mouse up testing log");
-            //     }
-            //   }
-            // });
+        if (!fabricCanvasRef.current) return;
+
+        const canvas = fabricCanvasRef.current;
+        let expandedLeft = false;
+        let expandedTop = false;
+        let expandedRight = false;
+        let expandedBottom = false;
+
+        const buffer = 50;
+
+        const handleMoving = (event) => {
+            const obj = event.target;
+
+            if (!obj) return;
+
+            obj.setCoords();
             if (
-                [
-                    "Bus",
-                    "Generator",
-                    "Load",
-                    "Shunt Device",
-                    "Filter",
-                    "Induction Motor",
-                    "Two winding transformer",
-                ].includes(event.target?.elementCategory)
+            [
+                "Bus",
+                "Generator",
+                "Load",
+                "Shunt Device",
+                "Filter",
+                "Induction Motor",
+                "Two winding transformer",
+            ].includes(obj.elementCategory)
             ) {
-                // console.log("updateSPolyline 536 --------------");
                 updateSPolyline(event, "moving");
             }
-            //updateSPolyline(event,"moving");
-            // groupedObject.on("moving", (event) => updateSPolyline(event,"moving"));
-            // groupedObject.on("mouseup", (event) => updateSPolyline(event,"mouseup"));
-        });
+
+            const buffer = 50;
+
+            obj.setCoords();
+            const leftEdge   = obj.left;
+            const topEdge    = obj.top;
+            const rightEdge  = obj.left + obj.width * obj.scaleX;
+            const bottomEdge = obj.top + obj.height * obj.scaleY;
+
+
+            if (!expandedRight && rightEdge > canvas.width - buffer) {
+                canvas.setWidth(canvas.width + 200);
+                expandedRight = true;
+                canvas.renderAll();
+                updateMinimap();
+            }
+
+            if (!expandedBottom && bottomEdge > canvas.height - buffer) {
+                canvas.setHeight(canvas.height + 200);
+                expandedBottom = true;
+                canvas.renderAll();
+                updateMinimap();
+
+            }
+
+            if (!expandedLeft && leftEdge < buffer) {
+                canvas.setWidth(canvas.width + 200);
+
+                canvas.getObjects().forEach((o) => {
+                    o.left += 200; // shift all objects
+                    o.setCoords(); // recalc bounding boxes for hit detection
+                });
+
+                obj.setCoords();
+                obj.left += 200;
+                
+                canvas.renderAll();
+                updateMinimap();
+                expandedLeft = true;
+            }
+
+            if (!expandedTop && topEdge < buffer) {
+                canvas.setHeight(canvas.height + 200);
+
+                canvas.getObjects().forEach((o) => {
+                    o.top += 200;
+                });
+
+                obj.setCoords();
+                obj.top += 200;
+                canvas.renderAll();
+                updateMinimap();
+                
+                expandedTop = true;
+            }
+        };
+
+        const resetFlags = () => {
+            expandedLeft = expandedTop = expandedRight = expandedBottom = false;
+        };
+
+
+        canvas.on("object:moving", handleMoving);
+        canvas.on("object:modified", resetFlags);
+
+        return () => {
+            canvas.off("object:moving", handleMoving);
+            canvas.off("object:modified", resetFlags);
+        };
     }, []);
+
 
     useEffect(() => {
         if (state.redoStack) {
@@ -1579,6 +1647,7 @@ function FabricCanvas({
             undo();
         }
     }, [state.redoStack, state.undoStack]);
+    
 
     const createPolyline = (firstObject, secondObject, points, lineId, opt) => {
         firstObject.setCoords();
@@ -1749,9 +1818,10 @@ function FabricCanvas({
         currentPlyline.set("toObjectId", secondObject.id);
 
         const formData = {
-            sFromBusName: firstObject.canvasProperty[1].propertyValue,
-            sToBusName: secondObject.canvasProperty[1].propertyValue,
+            sFromBusName: firstObject?.canvasProperty?.[1]?.propertyValue || "",
+            sToBusName: secondObject?.canvasProperty?.[1]?.propertyValue || "",
         };
+
 
         currentPlyline.set(
             "canvasProperty",
@@ -2797,115 +2867,149 @@ function FabricCanvas({
     };
 
     const deleteObject = () => {
-        var getActiveObject = fabricCanvasRef.current.getActiveObject();
-
-        if (getActiveObject) {
-            let previousActiveConnection = true;
-            if (getActiveObject?.elementCategory === "Bus") {
-                previousActiveConnection = deleteBus(getActiveObject.id);
-            } else {
-                previousActiveConnection = true;
-            }
-
-            if (deleteValidation(getActiveObject) && previousActiveConnection) {
-                const elements = fabricCanvasRef.current.getObjects();
-                if (
-                    getActiveObject.elementType == "svg" ||
-                    getActiveObject.type == "group"
-                ) {
-                    // Find the text object linked to this specific SVG
-                    const relatedData = getSpecificSvgRelatedData(
-                        getActiveObject.id,
-                        elements
-                    );
-
-                    const getLines = relatedData.filter(
-                        (data) => data.elementType === "line"
-                    );
-                    getLines.forEach((line) => {
-                        const getConnectedObjectId =
-                            line.fromObjectId === getActiveObject.id
-                                ? line.toObjectId
-                                : line.fromObjectId;
-                        const getConnectedObject = elements.find(
-                            (data) => data.id === getConnectedObjectId
-                        );
-
-                        const remainingConnectedLines =
-                            getConnectedObject?.connectingLine.filter(
-                                (id) => id !== line.id
-                            );
-                        const remainingConnectingElement =
-                            getConnectedObject?.connectingElement.filter(
-                                (id) => id !== getActiveObject.id
-                            );
-
-                        if (getConnectedObject) {
-                            getConnectedObject.set(
-                                "connectingLine",
-                                remainingConnectedLines
-                            );
-                            getConnectedObject.set(
-                                "connectingElement",
-                                remainingConnectingElement
-                            );
-                        }
-                    });
-                    const allElements = fabricCanvasRef.current.getObjects();
-                    allElements.forEach((element) => {
-                        if (element.type == "triangle") {
-                            if (
-                                element.id == `arrow-head-${getActiveObject.id}`
-                            ) {
-                                fabricCanvasRef.current.remove(element);
-                            }
-                        }
-                    });
-
-                    // Remove all related data from the canvas
-                    for (let i = 0; i < relatedData.length; i++) {
-                        fabricCanvasRef.current.remove(relatedData[i]);
-                    }
-                } else if (
-                    getActiveObject.type != "group" &&
-                    getActiveObject.name == "connectionLine"
-                ) {
-                    const fromObject = elements.find(
-                        (data) => data.id == getActiveObject.fromObjectId
-                    );
-                    const fromObjectConnectedLines =
-                        fromObject?.connectingLine.filter(
-                            (id) => id !== getActiveObject.id
-                        );
-                    fromObject.set("connectingLine", fromObjectConnectedLines);
-                    const toObject = elements.find(
-                        (data) => data.id == getActiveObject.toObjectId
-                    );
-                    const toObjectConnectedLines =
-                        toObject?.connectingLine.filter(
-                            (id) => id !== getActiveObject.id
-                        );
-                    toObject.set("connectingLine", toObjectConnectedLines);
-                    fabricCanvasRef.current.remove(getActiveObject);
-                    const lineObjecttext = elements.find(
-                        (data) => data.id == getActiveObject.textId
-                    );
-                    fabricCanvasRef.current.remove(lineObjecttext);
-                }
-                //fabricCanvasRef.current.remove(fabricCanvasRef.current.getActiveObject());
-            } else {
-                alert(
-                    "Failed to delete the BUS, Please remove the connection from the BUS and try again"
-                );
-            }
-        } else {
-            alert("Element not selected. Please select the element");
+    const canvas = fabricCanvasRef.current;
+    const getActiveObject = canvas.getActiveObject();
+ 
+    if (!getActiveObject) {
+      alert("Element not selected. Please select the element");
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      dispatch({ type: "DELETE_OBJECT", payload: false });
+      return;
+    }
+ 
+    console.log("Selected deleted object:", getActiveObject.elementCategory);
+ 
+    let previousActiveConnection = true;
+    if (getActiveObject?.elementCategory === "Bus") {
+      previousActiveConnection = deleteBus(getActiveObject.id);
+    }
+ 
+    if (!deleteValidation(getActiveObject) || !previousActiveConnection) {
+      alert(
+        "Failed to delete the BUS, Please remove the connection from the BUS and try again"
+      );
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      dispatch({ type: "DELETE_OBJECT", payload: false });
+      return;
+    }
+ 
+    const elements = canvas.getObjects();
+ 
+    if (
+      getActiveObject.elementCategory === "Transformer" ||
+      getActiveObject.elementType === "svg" ||
+      getActiveObject.type === "group"
+    ) {
+      const elements = canvas.getObjects();
+ 
+      if (getActiveObject.textId) {
+        const transformerLabel = elements.find(
+          (el) => el.id === getActiveObject.textId
+        );
+        if (transformerLabel) canvas.remove(transformerLabel);
+      } else {
+        const transformerLabel = elements.find(
+          (el) =>
+            el.type === "i-text" &&
+            (el.elementId === getActiveObject.id ||
+              el.parentId === getActiveObject.id)
+        );
+        if (transformerLabel) canvas.remove(transformerLabel);
+      }
+ 
+      const connectedLines = elements.filter(
+        (el) =>
+          el.elementType === "line" &&
+          (el.fromObjectId === getActiveObject.id ||
+            el.toObjectId === getActiveObject.id)
+      );
+ 
+      connectedLines.forEach((line) => {
+        const connectedId =
+          line.fromObjectId === getActiveObject.id
+            ? line.toObjectId
+            : line.fromObjectId;
+        const connectedObj = elements.find((e) => e.id === connectedId);
+ 
+        if (connectedObj) {
+          connectedObj.set(
+            "connectingLine",
+            connectedObj.connectingLine?.filter((id) => id !== line.id) || []
+          );
+          connectedObj.set(
+            "connectingElement",
+            connectedObj.connectingElement?.filter(
+              (id) => id !== getActiveObject.id
+            ) || []
+          );
         }
-        fabricCanvasRef.current.renderAll();
-        console.log("updateModifications calling 1641");
-        updateModifications(true);
-        dispatch({ type: "DELETE_OBJECT", payload: false });
-    };
+ 
+        if (line.textId) {
+          const lineLabel = elements.find((e) => e.id === line.textId);
+          if (lineLabel) canvas.remove(lineLabel);
+        }
+ 
+        const arrowHead = elements.find(
+          (e) => e.type === "triangle" && e.id === `arrow-head-${line.id}`
+        );
+        if (arrowHead) canvas.remove(arrowHead);
+ 
+        canvas.remove(line);
+      });
+ 
+      canvas.remove(getActiveObject);
+    } else if (
+      getActiveObject.type !== "group" &&
+      getActiveObject.name === "connectionLine"
+    ) {
+      const fromObject = elements.find(
+        (data) => data.id === getActiveObject.fromObjectId
+      );
+      if (fromObject) {
+        fromObject.set(
+          "connectingLine",
+          fromObject.connectingLine?.filter(
+            (id) => id !== getActiveObject.id
+          ) || []
+        );
+      }
+ 
+      const toObject = elements.find(
+        (data) => data.id === getActiveObject.toObjectId
+      );
+      if (toObject) {
+        toObject.set(
+          "connectingLine",
+          toObject.connectingLine?.filter((id) => id !== getActiveObject.id) ||
+            []
+        );
+      }
+ 
+      if (getActiveObject.textId) {
+        const lineLabel = elements.find(
+          (data) => data.id === getActiveObject.textId
+        );
+        if (lineLabel) canvas.remove(lineLabel);
+      }
+ 
+      const arrowHead = elements.find(
+        (e) =>
+          e.type === "triangle" && e.id === `arrow-head-${getActiveObject.id}`
+      );
+      if (arrowHead) canvas.remove(arrowHead);
+ 
+      canvas.remove(getActiveObject);
+    } else {
+      canvas.remove(getActiveObject);
+    }
+ 
+    canvas.renderAll();
+    console.log("updateModifications calling 1641");
+    updateModifications(true);
+    dispatch({ type: "DELETE_OBJECT", payload: false });
+  };
 
     const deleteBus = (busId) => {
         let isDeleted = true; // Track deletion status
@@ -4241,16 +4345,18 @@ function FabricCanvas({
     };
 
     const updateTextForLineObject = (object) => {
-        //const object = e.transform?.target;
-
-        //console.log("updateTextForLineObject-333",e);
         if (
-            object?.elementCategory == "Transmission Line" &&
-            object?.name == "connectionLine"
+            object?.elementCategory === "Transmission Line" &&
+            object?.name === "connectionLine"
         ) {
             const object1Text = fabricCanvasRef.current
                 .getObjects()
-                .filter((obj) => obj.id === object.textId)[0];
+                .find((obj) => obj.id === object.textId);
+
+            if (!object1Text) {
+                console.warn("No text object found for line:", object.textId);
+                return;
+            }
 
             let leftPosition = object.getCenterPoint().x;
             let topPosition = object.getCenterPoint().y;
@@ -4261,10 +4367,18 @@ function FabricCanvas({
                 topPosition = middleObject.y;
             }
 
-            object1Text.set("left", leftPosition);
-            object1Text.set("top", topPosition - 25);
+            console.log("leftPosition :", leftPosition);
+            console.log("topPosition :", topPosition);
+
+            object1Text.set({
+                left: leftPosition,
+                top: topPosition - 25,
+            });
+
+            fabricCanvasRef.current.renderAll();
         }
     };
+
 
     const addOutputText = (object, elementOutput) => {
         const text = new fabric.IText(elementOutput.name, {

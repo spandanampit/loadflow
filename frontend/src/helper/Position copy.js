@@ -352,15 +352,12 @@ export const getCoordBtwObjectsAndBus = (object1, object2, line) => {
     const obj2CenterX2 = (object2.oCoords.mt.x + object2.oCoords.mt.x) / 2;
     const obj2CenterY2 = object2.oCoords.mt.y;//(object2.oCoords.mt.y+object2.oCoords.mb.y)/2;
 
-    if (line && line.lineStartingPoint) {
+    if (line) {
         obj1Ml = object1.left + line.lineStartingPoint.x;
         obj1Mr = object1.left + line.lineStartingPoint.x;
         obj1CenterX1 = object1.left + line.lineStartingPoint.x;
         obj1CenterY1 = object1.top + line.lineStartingPoint.y;
-    } else {
-        console.warn("Line or lineStartingPoint missing:", line);
     }
-
 
     let startPoint = { x: 0, y: 0 };
     let endPoint = { x: 0, y: 0 };
