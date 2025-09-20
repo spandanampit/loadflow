@@ -464,14 +464,17 @@ function FabricCanvas({
     };
 
     useEffect(() => {
-        const canvas = fabricCanvasRef.current;
+        const canvas = fabricCanvasRef.current; // Reference to your Fabric.js canvas
         if (canvas == null) return;
+        // console.log(state.isEditPopupOpen)
+        // console.log(state.defaultvoltagebuscolor)
         var activeObject = fabricCanvasRef.current?.getActiveObject();
         let activeBusVolatage = null;
         let activeBusColor = null;
 
+        // Retrieve all objects from the canvas
         const allObjects = canvas.getObjects();
-        if (allObjects.length === 0) return;
+        if (allObjects.length === 0) return; // Exit if no objects are available
 
         if (
             activeObject &&
@@ -483,17 +486,19 @@ function FabricCanvas({
                     (item) => item.propertyName === "fBuskV"
                 )?.propertyValue || "220";
 
-            let colorOfBusIfPresentPreviously = state.voltageColors[currentVoltageOfbus];
+            let colorOfBusIfPresentPreviously =
+                state.voltageColors[currentVoltageOfbus];
             if (colorOfBusIfPresentPreviously) {
                 let setBusColor = addHashPrefix(colorOfBusIfPresentPreviously);
                 activeObject.set({ stroke: setBusColor });
                 activeObject.set({ fill: setBusColor });
-
+                // Update the canvas property for the bus
                 let iColorProperty = activeObject.canvasProperty.find(
                     (item) => item.propertyName === "iColor"
                 );
                 if (iColorProperty) {
-                    iColorProperty.propertyValue = colorOfBusIfPresentPreviously;
+                    iColorProperty.propertyValue =
+                        colorOfBusIfPresentPreviously;
                 }
                 console.log("Bus Voltage with color is present");
             }
@@ -504,12 +509,16 @@ function FabricCanvas({
                 activeObject.canvasProperty.find(
                     (item) => item.propertyName === "fBuskV"
                 )?.propertyValue || "220";
-            activeBusColor = activeObject.canvasProperty.find(
-                (item) => item.propertyName === "iColor"
-            )?.propertyValue || "black";
+            activeBusColor =
+                activeObject.canvasProperty.find(
+                    (item) => item.propertyName === "iColor"
+                )?.propertyValue || "black";
+            // if(state.isEditPopupOpen){
             updateBusColorInAllGUI(activeBusVolatage, activeBusColor);
+
+            // }
         }
-        
+        // Function to identify the connected buses for a given line (polyline)
         const identifyConnectedBuses = (line) => {
             const fromBus = allObjects.find(
                 (obj) => obj.id === line.fromObjectId
@@ -518,7 +527,9 @@ function FabricCanvas({
             return { fromBus, toBus };
         };
 
+        // Function to identify connected shunt elements for a given line
         const identifyConnectedShuntElements = (line) => {
+            // const fromShunt = allObjects.find(obj => obj.id === line.fromObjectId && ["Load", "Generator", "Filter", "Induction Motor"].includes(obj.elementCategory));
             const toShunt = allObjects.find(
                 (obj) =>
                     obj.id === line.toObjectId &&
@@ -529,6 +540,8 @@ function FabricCanvas({
             return { toShunt };
         };
 
+        // Identify connected buses for the transformer
+        // Function to find a bus connected to a line
         const findConnectedBus = (lineId) => {
             const line = allObjects.find(
                 (obj) => obj.id === lineId && obj.elementType === "line"
@@ -548,10 +561,12 @@ function FabricCanvas({
             return { fromBus, toBus };
         };
 
+        // Find the object linked to a text element
         const findLinkedObject = (linkedObjectId) => {
             return allObjects.find((obj) => obj.id === linkedObjectId);
         };
 
+        // Loop through all objects to find buses and lines, and then set stroke colors
         allObjects.forEach((obj) => {
             if (obj.elementCategory === "Bus") {
                 let validatedBusColor;
@@ -592,23 +607,22 @@ function FabricCanvas({
                     }
 
                     validatedBusColor = addHashPrefix(busColor);
-                    if (!state.isEditPopupOpen) {
-                        obj.set({ stroke: validatedBusColor });
-                        obj.set({ fill: validatedBusColor });
-                    }
-                    allObjects.forEach((lineObj) => {
-                        if (lineObj.elementType === "line") {
-                            const { fromBus, toBus } = identifyConnectedBuses(lineObj);
-                            if (fromBus && toBus) {
-                                if (fromBus.id === obj.id || toBus.id === obj.id) {
-                                    lineObj.set({
-                                        stroke: validatedBusColor,
-                                    });
-                                }
+                    obj.set({ stroke: validatedBusColor });
+                    obj.set({ fill: validatedBusColor });
+                }
+                allObjects.forEach((lineObj) => {
+                    if (lineObj.elementType === "line") {
+                        const { fromBus, toBus } =
+                            identifyConnectedBuses(lineObj);
+                        if (fromBus && toBus) {
+                            if (fromBus.id === obj.id || toBus.id === obj.id) {
+                                lineObj.set({
+                                    stroke: validatedBusColor,
+                                });
                             }
                         }
-                    });
-                }
+                    }
+                });
             }
 
             if (
@@ -642,24 +656,27 @@ function FabricCanvas({
                 });
             }
         });
-        
+        // Loop through all objects to find transformers, buses, and set colors
         allObjects.forEach((obj) => {
             if (
                 obj.elementCategory === "Two winding transformer" &&
                 Array.isArray(obj.connectingLine)
             ) {
-                const [lineId1, lineId2] = obj.connectingLine;
+                const [lineId1, lineId2] = obj.connectingLine; // Line IDs connecting to the transformer
 
+                // Find connected buses for each line
                 const { fromBus: bus1, toBus: bus2 } =
                     findConnectedBus(lineId1) || {};
                 const { fromBus: bus3, toBus: bus4 } =
                     findConnectedBus(lineId2) || {};
 
-                const connectedBuses = [bus1, bus2, bus3, bus4].filter(Boolean);
-                if (connectedBuses.length < 2) return;
+                const connectedBuses = [bus1, bus2, bus3, bus4].filter(Boolean); // Remove nulls
+                if (connectedBuses.length < 2) return; // Ensure there are two buses connected
 
+                // Assign the first two buses (assuming no more than two unique buses are connected)
                 const [busObj1, busObj2] = connectedBuses;
 
+                // Retrieve bus colors
                 const validatedBus1Color = addHashPrefix(
                     busObj1?.canvasProperty.find(
                         (item) => item.propertyName === "iColor"
@@ -671,10 +688,12 @@ function FabricCanvas({
                     )?.propertyValue || "black"
                 );
 
+                // Assuming transformer has grouped objects (ellipses representing connections)
                 const groupedObject = obj;
                 const ellipse1 = groupedObject._objects[0]; // First ellipse (left)
                 const ellipse2 = groupedObject._objects[1]; // Second ellipse (right)
 
+                // Assign colors to ellipses based on bus proximity
                 if (busObj1.left < groupedObject.left) {
                     ellipse1.set({
                         stroke: validatedBus2Color,
@@ -692,38 +711,44 @@ function FabricCanvas({
                 }
             }
 
+            // Color text elements based on their linked object
             if (obj.elementType === "text" && obj.textlinkedObjectId) {
                 const linkedObject = findLinkedObject(obj.textlinkedObjectId);
                 if (linkedObject) {
-                    const linkedColor = linkedObject.stroke || "black"; 
+                    const linkedColor = linkedObject.stroke || "black"; // Use stroke color of the linked object
                     const validatedColor = addHashPrefix(linkedColor);
-                    obj.set({ fill: validatedColor });
+                    obj.set({ fill: validatedColor }); // Set text color
                 }
             }
         });
 
+        // Re-render the canvas to apply the color changes
         canvas.renderAll();
 
+        // Cleanup function to reset colors when selection changes
         return () => {
-            canvas.renderAll();
+            canvas.renderAll(); // Re-render the canvas to apply changes
         };
     }, [
         selectedElement,
         state.clicked,
         state.dropped,
         state.position,
-        state.isEditPopupOpen,
+        // state.isEditPopupOpen,
         state.selectedElement,
-    ]);
+    ]); // Dependency on selected element and bus objects
 
     useEffect(() => {
         if (state.isEditPopupOpen) {
+            // Ensure canvasInstance is updated before opening the popup
             const objects = fabricCanvasRef.current
                 ? fabricCanvasRef.current.getObjects()
                 : [];
-            setCanvasObjects(objects);
+            setCanvasObjects(objects); // Assuming setCanvasInstance is your state updater
         }
     }, [state.isEditPopupOpen]);
+    // const minimapWrapper = document.createElement('div');
+    // minimapWrapper.id = 'minimapWrapper';
 
 
     function getScaleFactor() {
